@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>MediaSync</title>
+</head>
+<body>
+  <h1>上传媒体文件</h1>
+  <input type="file" id="fileInput" />
+  <button onclick="uploadFile()">上传</button>
+  <p id="status"></p>
+
+  <script>
+    async function uploadFile() {
+      const fileInput = document.getElementById('fileInput');
+      const file = fileInput.files[0];
+      if (!file) {
+        alert('请选择一个文件');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('https://mediasync-functions.azurewebsites.net/api/upload', {
+        method: 'POST',
+        body: formData
+      });
+      const result = await response.json();
+      document.getElementById('status').innerText = result.message;
+    }
+  </script>
+</body>
+</html>
