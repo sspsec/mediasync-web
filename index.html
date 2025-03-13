@@ -2,65 +2,156 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>MediaSync</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MediaSync - 云媒体管理</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 20px auto;
+      padding: 20px;
+    }
+    h1 {
+      color: #333;
+    }
+    .input-group {
+      margin: 10px 0;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    input[type="file"], input[type="text"] {
+      padding: 5px;
+    }
+    button {
+      padding: 8px 16px;
+      background-color: #0078d4;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #005ea2;
+    }
+    #status {
+      margin-top: 20px;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    .error {
+      color: red;
+    }
+    .success {
+      color: green;
+    }
+  </style>
 </head>
 <body>
   <h1>MediaSync - 云媒体管理</h1>
-  <input type="file" id="fileInput" />
-  <button onclick="uploadFile()">上传</button>
-  <input type="text" id="mediaId" placeholder="输入媒体ID" />
-  <button onclick="getFile()">获取</button>
-  <button onclick="updateFile()">更新</button>
-  <button onclick="deleteFile()">删除</button>
-  <p id="status"></p>
+  <div class="input-group">
+    <input type="file" id="fileInput" />
+    <button onclick="uploadFile()">上传</button>
+  </div>
+  <div class="input-group">
+    <input type="text" id="mediaId" placeholder="输入媒体ID" />
+    <button onclick="getFile()">获取</button>
+    <button onclick="updateFile()">更新</button>
+    <button onclick="deleteFile()">删除</button>
+  </div>
+  <div id="status"></div>
 
   <script>
     const apiBaseUrl = "https://mediasync-functions.azurewebsites.net/api";
+    const statusElement = document.getElementById('status');
+
+    async function handleResponse(response) {
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message || '请求失败');
+      }
+      return result;
+    }
+
+    function displayStatus(message, isError = false) {
+      statusElement.innerText = message;
+      statusElement.className = isError ? 'error' : 'success';
+    }
 
     async function uploadFile() {
       const fileInput = document.getElementById('fileInput');
       const file = fileInput.files[0];
-      if (!file) return alert('请选择文件');
+      if (!file) return displayStatus('请选择文件', true);
 
       const formData = new FormData();
       formData.append('file', file);
-      const response = await fetch(`${apiBaseUrl}/upload`, {
-        method: 'POST',
-        body: formData
-      });
-      const result = await response.json();
-      document.getElementById('status').innerText = result.message;
+      try {
+        const response = await fetch(`${apiBaseUrl}/upload`, {
+          method: 'POST',
+          body: formData
+        });
+        const result = await handleResponse(response);
+        displayStatus(`文件上传成功！\nID: ${result.id}`);
+        document.getElementById('mediaId').value = result.id; // 自动填充 ID
+      } catch (error) {
+        displayStatus(`上传失败：${error.message}`, true);
+      }
     }
 
     async function getFile() {
-      const id = document.getElementById('mediaId').value;
-      if (!id) return alert('请输入媒体ID');
-      const response = await fetch(`${apiBaseUrl}/media/${id}`);
-      const result = await response.json();
-      document.getElementById('status').innerText = JSON.stringify(result);
+      const id = document.getElementById('mediaId').value.trim();
+      if (!id) return displayStatus('请输入媒体ID', true);
+
+      try {
+        const response = await fetch(`${apiBaseUrl}/media/${id}`, {
+          method: 'GET'
+        });
+        const result = await handleResponse(response);
+        displayStatus(`媒体信息：\n${JSON.stringify(result, null, 2)}`);
+      } catch (error) {
+        displayStatus(`获取失败：${error.message}`, true);
+      }
     }
 
     async function updateFile() {
-      const id = document.getElementById('mediaId').value;
-      if (!id) return alert('请输入媒体ID');
+      const id = document.getElementById('mediaId').value.trim();
+      const fileInput = document.getElementById('fileInput');
+      const file = fileInput.files[0];
+      if (!id) return displayStatus('请输入媒体ID', true);
+
       const formData = new FormData();
-      formData.append('fileName', 'updated-' + id);
-      const response = await fetch(`${apiBaseUrl}/media/${id}`, {
-        method: 'PUT',
-        body: formData
-      });
-      const result = await response.json();
-      document.getElementById('status').innerText = result.message;
+      formData.append('fileName', `updated-${id}`); // 默认更新文件名
+      if (file) formData.append('file', file); // 可选上传新文件
+
+      try {
+        const response = await fetch(`${apiBaseUrl}/media/${id}`, {
+          method: 'PUT',
+          body: formData
+        });
+        const result = await handleResponse(response);
+        displayStatus(`更新成功！\n新信息：${JSON.stringify(result.updatedItem, null, 2)}`);
+      } catch (error) {
+        displayStatus(`更新失败：${error.message}`, true);
+      }
     }
 
     async function deleteFile() {
-      const id = document.getElementById('mediaId').value;
-      if (!id) return alert('请输入媒体ID');
-      const response = await fetch(`${apiBaseUrl}/media/${id}`, {
-        method: 'DELETE'
-      });
-      const result = await response.json();
-      document.getElementById('status').innerText = result.message;
+      const id = document.getElementById('mediaId').value.trim();
+      if (!id) return displayStatus('请输入媒体ID', true);
+
+      try {
+        const response = await fetch(`${apiBaseUrl}/media/${id}`, {
+          method: 'DELETE'
+        });
+        const result = await handleResponse(response);
+        displayStatus('删除成功！');
+        document.getElementById('mediaId').value = ''; // 清空 ID 输入框
+      } catch (error) {
+        displayStatus(`删除失败：${error.message}`, true);
+      }
     }
   </script>
 </body>
